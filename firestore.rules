@@ -35,6 +35,7 @@ service cloud.firestore {
 
     // Users — admin+ can list/update all; users can read their own
     match /users/{userId} {
+      allow list: if isAdmin();
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create: if isAuthenticated();
       allow update: if isAdmin() || request.auth.uid == userId;

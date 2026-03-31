@@ -127,6 +127,10 @@ export const subscribeToUsers = (callback) => {
   return onSnapshot(q, (snapshot) => {
     const users = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
     callback(users)
+  }, (error) => {
+    console.error('Error fetching users:', error)
+    // Still call callback with empty array to prevent UI from breaking
+    callback([])
   })
 }
 
