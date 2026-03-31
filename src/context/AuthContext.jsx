@@ -9,9 +9,14 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let profileCheckTimeout
+    
     const unsub = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         try {
+          // Clear any existing timeout
+          if (profileCheckTimeout) clearTimeout(profileCheckTimeout)
+          
           const profile = await getUserProfile(firebaseUser.uid)
           
           // Check if profile exists and is approved
@@ -23,35 +28,53 @@ export const AuthProvider = ({ children }) => {
             }
             setUser(firebaseUser)
             setUserProfile(userWithDefaults)
+            setLoading(false)
           } else if (profile && profile.status === 'pending') {
-            // User is still pending, logout
-            await logoutUser()
-            setUser(null)
-            setUserProfile(null)
+            // User is still pending, logout but don't force immediately
+            // Give it one more chance in case approval just happened
+            profileCheckTimeout = setTimeout(async () => {
+              const updatedProfile = await getUserProfile(firebaseUser.uid)
+              if (updatedProfile && updatedProfile.status === 'approved') {
+                setUserProfile({ ...updatedProfile, role: updatedProfile.role || 'user' })
+                setUser(firebaseUser)
+              } else {
+                await logoutUser()
+                setUser(null)
+                setUserProfile(null)
+              }
+              setLoading(false)
+            }, 1000)
           } else if (profile && profile.status === 'rejected') {
             // User is rejected, logout
             await logoutUser()
             setUser(null)
             setUserProfile(null)
+            setLoading(false)
           } else {
             // Profile not found or invalid, logout
             await logoutUser()
             setUser(null)
             setUserProfile(null)
+            setLoading(false)
           }
         } catch (error) {
           console.error('Error loading user profile:', error)
           await logoutUser()
           setUser(null)
           setUserProfile(null)
+          setLoading(false)
         }
       } else {
         setUser(null)
         setUserProfile(null)
+        setLoading(false)
       }
-      setLoading(false)
     })
-    return unsub
+    
+    return () => {
+      unsub()
+      if (profileCheckTimeout) clearTimeout(profileCheckTimeout)
+    }
   }, [])
 
   const logout = async () => {
@@ -62,12 +85,16 @@ export const AuthProvider = ({ children }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      const profile = await getUserProfile(user.uid)
-      if (profile && profile.status === 'approved') {
-        setUserProfile({
-          ...profile,
-          role: profile.role || 'user'
-        })
+      try {
+        const profile = await getUserProfile(user.uid)
+        if (profile && profile.status === 'approved') {
+          setUserProfile({
+            ...profile,
+            role: profile.role || 'user'
+          })
+        }
+      } catch (error) {
+        console.error('Error refreshing profile:', error)
       }
     }
   }

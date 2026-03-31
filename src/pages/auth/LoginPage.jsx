@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Package, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -20,12 +20,14 @@ export const LoginPage = () => {
   const onSubmit = async ({ email, password }) => {
     setLoading(true)
     try {
-      await loginUser(email, password)
+      const result = await loginUser(email, password)
       toast.success('Welcome back!')
-      navigate('/dashboard')
+      // Small delay to ensure auth state updates
+      setTimeout(() => {
+        navigate('/dashboard')
+      }, 500)
     } catch (err) {
       toast.error(err.message)
-    } finally {
       setLoading(false)
     }
   }
